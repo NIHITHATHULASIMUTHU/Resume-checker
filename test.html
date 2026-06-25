@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Skill Gap Finder | Test Runner Suite</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: #0f172a;
+      color: #e2e8f0;
+      padding: 2rem;
+      max-width: 800px;
+      margin: 0 auto;
+    }
+    h1 {
+      border-bottom: 1px solid #334155;
+      padding-bottom: 0.5rem;
+      color: #38bdf8;
+    }
+    .test-case {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+    }
+    .test-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1rem;
+    }
+    .test-title {
+      font-size: 1.2rem;
+      font-weight: bold;
+    }
+    .status {
+      padding: 0.25rem 0.75rem;
+      border-radius: 9999px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+    .status.pass {
+      background: rgba(16, 185, 129, 0.2);
+      color: #34d399;
+      border: 1px solid rgba(16, 185, 129, 0.4);
+    }
+    .status.fail {
+      background: rgba(239, 68, 68, 0.2);
+      color: #f87171;
+      border: 1px solid rgba(239, 68, 68, 0.4);
+    }
+    .details {
+      font-family: monospace;
+      background: #0f172a;
+      padding: 1rem;
+      border-radius: 4px;
+      font-size: 0.9rem;
+      white-space: pre-wrap;
+      overflow-x: auto;
+      max-height: 200px;
+      border: 1px solid #1e293b;
+    }
+    .summary-card {
+      background: #1e1b4b;
+      border: 1px solid #312e81;
+      padding: 1rem;
+      border-radius: 8px;
+      margin-bottom: 2rem;
+      text-align: center;
+      font-size: 1.1rem;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Skill Gap Finder | Verification Suite</h1>
+  <div class="summary-card" id="suite-summary">Running tests...</div>
+  <div id="test-results-container"></div>
+
+  <!-- Load files to test -->
+  <script src="skills-db.js"></script>
+  <script src="analyzer.js"></script>
+
+  <script>
+    // Mock resume database for tests
+    const TEST_CASES = [
+      {
+        name: "Test 1: Frontend Developer (Basic Match)",
+        roleId: "frontend_developer",
+        resumeText: `
+          John Doe - Web Developer
+          Skills: HTML, CSS, JavaScript (ES6), Git, GitHub.
+          Experience building responsive web layout interfaces with HTML5 & CSS3.
+          Also used basic REST APIs and JSON requests.
+        `,
+        assertions: (result) => {
+          const matchedIds = result.matchedSkills.map(s => s.id);
+          const hasHtml = matchedIds.includes("html");
+          const hasCss = matchedIds.includes("css");
+          const hasJs = matchedIds.includes("javascript");
+          const hasGit = matchedIds.includes("git");
+          
+          if (!hasHtml || !hasCss || !hasJs || !hasGit) {
+            return { pass: false, error: "Failed to extract core frontend skills (HTML, CSS, JS, Git)" };
+          }
+          if (result.matchPercentage < 40) {
+            return { pass: false, error: `Score too low: ${result.matchPercentage}% (expected >= 40%)` };
+          }
+          return { pass: true };
+        }
+      },
+      {
+        name: "Test 2: Backend Developer (Postgresql Synonym Mapping)",
+        roleId: "backend_developer",
+        resumeText: `
+          Sarah Smith - Backend Systems Engineer
+          Experience: Node.js, Express, Postgresql database schemas.
+          Created API servers, RESTful microservices.
+          Built container pipelines with Docker.
+        `,
+        assertions: (result) => {
+          const matchedIds = result.matchedSkills.map(s => s.id);
+          const hasNode = matchedIds.includes("nodejs");
+          const hasSql = matchedIds.includes("databases_sql"); // Should match via "postgresql" synonym
+          const hasDocker = matchedIds.includes("docker");
+          
+          if (!hasNode) return { pass: false, error: "Missing Node.js mapping" };
+          if (!hasSql) return { pass: false, error: "Failed synonym mapping: PostgreSQL should map to databases_sql" };
+          if (!hasDocker) return { pass: false, error: "Missing Docker mapping" };
+          return { pass: true };
+        }
+      },
+      {
+        name: "Test 3: AI Engineer (NLP & Deep Learning)",
+        roleId: "ai_engineer",
+        resumeText: `
+          AI Engineer
+          Deep Learning and PyTorch neural network model development.
+          Completed research in NLP (Natural Language Processing) using transformers.
+          Programming languages: Python.
+        `,
+        assertions: (result) => {
+          const matchedIds = result.matchedSkills.map(s => s.id);
+          const hasPython = matchedIds.includes("python");
+          const hasPytorch = matchedIds.includes("pytorch");
+          const hasDeep = matchedIds.includes("deep_learning");
+          const hasNlp = matchedIds.includes("nlp");
+
+          if (!hasPython || !hasPytorch || !hasDeep || !hasNlp) {
+            return { pass: false, error: "Failed to extract AI engineer stack components" };
+          }
+          if (result.roadmap.length === 0) {
+            return { pass: false, error: "Roadmap should have entries for missing skill gaps" };
+          }
+          return { pass: true };
+        }
+      }
+    ];
+
+    window.addEventListener("DOMContentLoaded", () => {
+      const container = document.getElementById("test-results-container");
+      let passCount = 0;
+      let totalCount = TEST_CASES.length;
+
+      TEST_CASES.forEach(tc => {
+        const result = window.ResumeAnalyzer.analyze(tc.resumeText, tc.roleId);
+        let check = { pass: false, error: "Unknown" };
+        
+        try {
+          check = tc.assertions(result);
+        } catch (e) {
+          check = { pass: false, error: e.message };
+        }
+
+        if (check.pass) passCount++;
+
+        // Render card
+        const card = document.createElement("div");
+        card.className = "test-case";
+        
+        card.innerHTML = `
+          <div class="test-header">
+            <span class="test-title">${tc.name}</span>
+            <span class="status ${check.pass ? 'pass' : 'fail'}">${check.pass ? 'PASS' : 'FAIL'}</span>
+          </div>
+          ${!check.pass ? `<div style="color: #f87171; margin-bottom: 0.5rem; font-weight: 500;">Error: ${check.error}</div>` : ''}
+          <div class="details">Target Role: ${result.roleName}
+Match Score: ${result.matchPercentage}%
+Resume Strength: ${result.resumeStrength}/100
+Matched Skills: ${result.matchedSkills.map(s => s.name).join(", ")}
+Missing Gaps: ${result.missingSkills.map(s => s.name).join(", ")}
+Roadmap Size: ${result.roadmap.length} modules
+Suggestions Count: ${result.suggestions.length} tips
+          </div>
+        `;
+        container.appendChild(card);
+      });
+
+      // Render summary
+      const summaryCard = document.getElementById("suite-summary");
+      summaryCard.textContent = `Verification Results: ${passCount} / ${totalCount} Passed (${Math.round((passCount/totalCount)*100)}%)`;
+      if (passCount === totalCount) {
+        summaryCard.style.background = "#064e3b";
+        summaryCard.style.borderColor = "#065f46";
+      } else {
+        summaryCard.style.background = "#7f1d1d";
+        summaryCard.style.borderColor = "#991b1b";
+      }
+    });
+  </script>
+</body>
+</html>
